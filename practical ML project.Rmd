@@ -1,0 +1,79 @@
+---
+title: "Course Project for Practical Machine Learning"
+output: html_notebook
+---
+##Background and Purpose of the Project
+This project uses the data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways,namely: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). The goal is to perform a number of machine learning methods and choose the one that best predicts the class of barbell left given a particular data.
+
+
+##Downloading the data sets 
+Downloading the data sets and assigning them with object names.
+```{r}
+training1 <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"), na.strings=c("NA","#DIV/0!",""))
+
+testing1 <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"), na.strings=c("NA","#DIV/0!",""))
+
+training <- training1; testing <- testing1 # the goal is to create a copy and not to destroy the original data
+```
+##Pre-processing for the training data
+There are 160 variables and using all of them will slow down the training process. In this substep, the training data set is cleaned by removing variables with little variation plus and variables with NAs. Some variables with some NAs could be retained but since there are several variables to choose, this decision has been done.
+```{r}
+library(caret)
+#removes the variables with minimal variation
+nzv <- nearZeroVar(training, saveMetrics=TRUE)
+training <- training[,nzv$nzv==FALSE]
+#removes the columns o
+coltoremove <- which(colSums(is.na(training))>0*dim(training)[1]) 
+training <- training[,-coltoremove]
+training <- training[,-1] #remove the id column
+```
+In the partitioning the training data, this student chooses the 50/50 split to make the computation time in machine learning shorter.
+```{r}
+set.seed(1234)
+partition <- createDataPartition(training$classe, p=0.5, list=FALSE)
+training_trn <- training[partition,]
+training_tst <- training[-partition,]
+```
+##Training using Machine Learning 
+Based on initial observation, the native libraries implement the training faster than through a caret wrapper, hence, they are used here.
+
+####Decision/Regression Tree
+In Regression Tree, the number of cross-validations used is 10, the default value of `rpart.control()`. In addition, the other parameters that control aspects of the `rpart` fit are also the default values.
+```{r}
+library(rpart)
+mod1 <- rpart(classe~.,method="class",data=training_trn)
+library(rattle)
+fancyRpartPlot(mod1)
+pred1 <- predict(mod1, training_tst, type = "class") 
+confusionMatrix(pred1, training_tst$classe)
+```
+####Random Forest
+The paramters used in `randomForest()` are defaults. 
+```{r}
+library(randomForest)
+mod2 <- randomForest(classe~.,method="rf",data=training_trn)
+pred2 <- predict(mod2, training_tst, type = "class")
+confusionMatrix(pred2, training_tst$classe)
+```
+##Discussion
+Based on the accurary, the random forest has better accuracy at 99.8% compared to regression tree at 86.8%. From this result, the better model for prediction in this particular data is random forest.
+##Pre-processing for out-of-samlple testing data
+Making the out-of-sample testing data similar to training data is necessary especially for random forest, to avoid spitting out an error message.
+```{r}
+#making the out-of-sample testing similar with training data
+x <- names(training[1:57])
+y <- testing[,x]
+y$classe <- testing$problem_id
+#to avoid error for random forest model
+y<- rbind(training_trn[1, ] , y)
+y <- y[-1,]
+```
+##Prediction of two models for out-of-sample
+The result below when submitted to Coursera quiz shows that random forest gets a score of 20/20 compared to regression tree with a score of 18/20. This is another confirmation that random forest is a better model in predicting tis particular out-of-sample test set.
+```{r}
+predict(mod1, newdata =y, type = "class")
+predict(mod2, newdata =y, type = "class")
+```
+##Summary and Conclusion
+This course project demonstrate how to implement machine learning to predict given a particular data. Between the two methods tried here, random forest is a better method in handling the task at hand.
+It is worth noting that, although there are other machine learning methods, they have not been shown here because initial test show that they cause computer to crash given the size of the training data.
